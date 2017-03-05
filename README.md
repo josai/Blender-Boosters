@@ -4,4 +4,10 @@
 
 ### Approach 
 
-**Blender-Boosters** uses a genetic algorithm to effectively determine what the optimum render settings are  for a given scene on a given machine. It does this by rendering several "sample" renders with different settings. Then out of the samples it uses the fastest rendered settings and continues to iterate upon that, repeating the process for several generations. until you hopefully have much more efficient settings for your set up.
+**Blender-Boosters** uses a genetic algorithm to optimize render settings for a given scene on a given machine. It does this by rendering several sample/prototype renders with different settings. Then out of the samples it uses the the settings that rendered the image the fastest and continues to iterate upon that prototype, repeating the process for several generations until you hopefully have much more time efficient settings for your set up.
+
+
+### Benefits
+
+
+### Drawbacks 
