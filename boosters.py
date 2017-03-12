@@ -1,13 +1,28 @@
 import bpy
 import csv
+import random
 from pathlib import Path
+from datetime import datetime
 
 
 def main():
+    count = 0
+    settings = Settings()
     blend = Commands()
-    first = Chromosome()
-    blend.render_image('hiiiii')
-    blend.render_image('byeeee')
+    while count < 5:
+        gene = Chromosome(str(count))
+        gene.mutagen(settings.mutation_rate)
+        gene.make_render_settings()
+        blend.render_image(gene)
+        count += (1)
+
+
+class Settings(object):
+    '''
+    Global settings such as mutation rate
+    '''
+    def __init__(self):
+        self.mutation_rate = 0.5
 
 
 class Commands(object):
@@ -24,19 +39,15 @@ class Commands(object):
         self.data_mgmt = Data_Management()
 
 
-    def render_image(self, image_name):
-        image_path = ((R'render-bin\ ')[:-1] + image_name)
+    def render_image(self, chromosome):
+        image_path = ((R'render-bin\ ')[:-1] + chromosome.name)
         switch_path(self, image_path)
+        chromosome.start_timer()
         bpy.ops.render.render(write_still=True)
+        chromosome.stop_timer()
         csv_file_path = self.current_render_path[:-len(image_path)]
         switch_path(self, image_path)
-        # test
-        t1 = Chromosome()
-        t2 = Chromosome()
-        t2.tile_x.attribute = 10
-        test = [t1, t2]
-        # end test
-        self.data_mgmt.write_csv(csv_file_path, 'settings_data.csv', test)
+        self.data_mgmt.write_csv(csv_file_path, 'data.csv', [chromosome])
 
 
 def switch_path(path, file_name):
@@ -78,7 +89,6 @@ class Data_Management(object):
         path = path + file_name
         file = Path(path)
         if file.is_file():
-            print ('its reals')
             add_csv_log(path, data)
         else:
             create_csv(path, data)
@@ -105,11 +115,9 @@ def add_csv_log(path, data):
     with open(path, 'a') as f:
         file = csv.writer(f, delimiter=',')
         attributes = []
-        print (len(data))
         for data_point in data:
             for fine_data in data_point.DNA_Strand:
                 attributes.append(fine_data.attribute)
-            print (attributes)
             file.writerow(attributes)
             attributes = []
 
@@ -120,10 +128,10 @@ class Chromosome(object):
     A strand of DNA is simply a render setting in this case. By default it
     is set to what ever your current render settings are.
     '''
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         cycles = bpy.types.CyclesRenderSettings
         scene = bpy.data.scenes[0]
-        self.render_duration = 0.0
         self.tile_x = DNA(scene.render.tile_x, 
                                        False,
                                        1,
@@ -139,6 +147,48 @@ class Chromosome(object):
                                        'tile_y'
                                        )
         self.DNA_Strand = [self.tile_x, self.tile_y]
+
+
+    def mutagen(self, mutation_rate):
+        '''
+        Mutates the DNA in the DNA strand based off random chance and
+        mutation rate.
+        '''
+        for strand in self.DNA_Strand:
+            mutation = roll_dice(mutation_rate)
+            if mutation:
+                strand.mutate()
+
+
+    def make_render_settings(self):
+        self.DNA_Strand = (list(set(self.DNA_Strand)))
+        for strand in self.DNA_Strand:
+            strand.make_real()
+
+
+    def start_timer(self):
+        self.render_duration = DNA(datetime.now(), 
+                                       True,
+                                       0,
+                                       1,
+                                       None,
+                                       'render_duration'
+                                       )
+
+
+    def stop_timer(self):
+        start = self.render_duration.attribute
+        self.render_duration.attribute = datetime.now() - start
+        self.DNA_Strand.append(self.render_duration)
+        print (self.render_duration.attribute)
+
+
+def roll_dice(odds):
+    roll = random.uniform(0.00001, 0.99999)
+    if roll < odds:
+        return True
+    else:
+        return False
 
 
 class DNA(object):
@@ -159,6 +209,16 @@ class DNA(object):
         self.minimum = minimum
         self.maximum = maximum
         self.name = name
+
+
+    def mutate(self):
+        '''
+        Mutates a piece of DNA.
+        '''
+        if self.boolean:
+            self.attribute = random.choice([self.minimum, self.maximum])
+        else:
+            self.attribute = random.randint(self.minimum, self.maximum)
 
 
     def make_real(self):
