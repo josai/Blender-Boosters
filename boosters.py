@@ -1,5 +1,6 @@
 import bpy
 import csv
+from pathlib import Path
 
 
 def main():
@@ -29,7 +30,13 @@ class Commands(object):
         bpy.ops.render.render(write_still=True)
         csv_file_path = self.current_render_path[:-len(image_path)]
         switch_path(self, image_path)
-        self.data_mgmt.add_csv_log(csv_file_path, 'settings_data.csv', [1, 3])
+        # test
+        t1 = Chromosome()
+        t2 = Chromosome()
+        t2.tile_x.attribute = 10
+        test = [t1, t2]
+        # end test
+        self.data_mgmt.write_csv(csv_file_path, 'settings_data.csv', test)
 
 
 def switch_path(path, file_name):
@@ -67,17 +74,44 @@ class Data_Management(object):
     creates and uses to store data on each gene.
     '''
 
-    def add_csv_log(self, path, file_name, data):
-        '''
-        This saves the dna of a chromosome in a csv file.
-        '''
+    def write_csv(self, path, file_name, data):
         path = path + file_name
-        with open(path, 'w') as csvfile:
-            filewriter = csv.writer(csvfile, delimiter=' ')
-            for data_point in data:
-                filewriter.writerow('hi')
+        file = Path(path)
+        if file.is_file():
+            print ('its reals')
+            add_csv_log(path, data)
+        else:
+            create_csv(path, data)
 
 
+def create_csv(path, data):
+    '''
+    This saves the dna of a chromosome in a csv file.
+    '''
+    head = (data[0].DNA_Strand)
+    headers = []
+    for header in head:
+        headers.append(header.name)
+    with open(path, 'w') as f:
+        file = csv.writer(f, delimiter=',')
+        file.writerow(headers)
+    add_csv_log(path, data)
+
+
+def add_csv_log(path, data):
+    '''
+    This saves the dna of a chromosome in a csv file.
+    '''
+    with open(path, 'a') as f:
+        file = csv.writer(f, delimiter=',')
+        attributes = []
+        print (len(data))
+        for data_point in data:
+            for fine_data in data_point.DNA_Strand:
+                attributes.append(fine_data.attribute)
+            print (attributes)
+            file.writerow(attributes)
+            attributes = []
 
 
 class Chromosome(object):
@@ -94,15 +128,17 @@ class Chromosome(object):
                                        False,
                                        1,
                                        1000,
-                                       None
+                                       None,
+                                       'tile_x'
                                        )
         self.tile_y = DNA(scene.render.tile_y, 
                                        False,
                                        1,
                                        1000,
-                                       None
+                                       None,
+                                       'tile_y'
                                        )
-        print (scene.render.tile_x)
+        self.DNA_Strand = [self.tile_x, self.tile_y]
 
 
 class DNA(object):
@@ -112,7 +148,7 @@ class DNA(object):
     boosters program. It facilates the interactions between boosters
     functions and blenders render settings.
     '''
-    def __init__(self, raw_material, boolean, minimum, maximum, key):
+    def __init__(self, raw_material, boolean, minimum, maximum, key, name):
         self.real_setting = raw_material
         self.key = key
         if self.key != None:
@@ -122,6 +158,7 @@ class DNA(object):
         self.boolean = boolean
         self.minimum = minimum
         self.maximum = maximum
+        self.name = name
 
 
     def make_real(self):
