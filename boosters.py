@@ -17,18 +17,19 @@ class Commands(object):
     for the purposes of this program.
     '''
     def __init__(self):
-        self.main_render_path = (str(bpy.data.scenes["Scene"].render.filepath))
+        path = (bpy.data.scenes["Scene"].render.filepath)
+        self.main_render_path = clip_path(path)
         self.current_render_path = self.main_render_path
         self.data_mgmt = Data_Management()
 
 
     def render_image(self, image_name):
-        image_path = self
-        switch_path(image_path, image_name)
+        image_path = ((R'render-bin\ ')[:-1] + image_name)
+        switch_path(self, image_path)
         bpy.ops.render.render(write_still=True)
-        p = self.current_render_path
-        switch_path(image_path, image_name)
-        self.data_mgmt.add_csv_log(p, 'test.csv', [1, 3])
+        csv_file_path = self.current_render_path[:-len(image_path)]
+        switch_path(self, image_path)
+        self.data_mgmt.add_csv_log(csv_file_path, 'settings_data.csv', [1, 3])
 
 
 def switch_path(path, file_name):
@@ -40,12 +41,24 @@ def switch_path(path, file_name):
     '''
     if path.current_render_path == path.main_render_path:
         print ('Switching file path to boosters...')
-        sub_folder = (R'boosters-data\ ')
+        sub_folder = (clip_path(R'boosters-data\ '))
         sub_render_path = (str(path.main_render_path) + sub_folder)
-        path.current_render_path = str(sub_render_path + file_name)
+        path.current_render_path = str(clip_path(sub_render_path) + file_name)
     else:
-        path.current_render_path = str(path.main_render_path)
+        path.current_render_path = clip_path(path.main_render_path)
     bpy.data.scenes["Scene"].render.filepath = (path.current_render_path)
+
+
+def clip_path(a_file_path):
+    '''
+    Clips a file path down to the current folder. This is to remove file 
+    names from the path name.
+    '''
+    path = str(a_file_path)[::-1]
+    backslash = ((R'\ ')[0])
+    index = (path.index(backslash))
+    path = ((path[index:])[::-1])
+    return (path)
 
 
 class Data_Management(object):
