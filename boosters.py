@@ -40,7 +40,6 @@ class Commands(object):
 
 
     def render_image(self, chromosome):
-        tester(chromosome)
         image_path = ((R'render-bin\ ')[:-1] + chromosome.name)
         switch_path(self, image_path)
         chromosome.start_timer()
@@ -49,22 +48,6 @@ class Commands(object):
         csv_file_path = self.current_render_path[:-len(image_path)]
         switch_path(self, image_path)
         self.data_mgmt.write_csv(csv_file_path, 'data.csv', [chromosome])
-
-
-def tester(dna):
-    cycles = bpy.types.CyclesRenderSettings
-    scene = bpy.data.scenes[0]
-    cy = [cycles.aa_samples, 
-               cycles.ao_samples,
-               cycles.blur_glossy, 
-               cycles.debug_bvh_type,
-               cycles.debug_use_spatial_splits,
-               cycles.device,
-               cycles.diffuse_bounces,
-               cycles.film_exposure,
-               cycles.samples,
-             ]
-
 
 
 def switch_path(path, file_name):
@@ -141,35 +124,51 @@ def add_csv_log(path, data):
 
 class Chromosome(object):
     '''
+    -Factory Method?
     In the chromosome is where we keep the DNA structure of each individual.
     A strand of DNA is simply a render setting in this case. By default it
     is set to what ever your current render settings are.
     '''
     def __init__(self, name):
+        settings = bpy.data.scenes[0]
         self.name = name
-        cycles = bpy.types.CyclesRenderSettings
-        scene = bpy.data.scenes[0]
-        self.samples = DNA(scene.cycles.samples,
+        self.scene_settings = settings.render
+        self.cycles_settings = settings.cycles
+        self.aa_samples = DNA(self.cycles_settings.aa_samples,
+                                       False,
+                                       1,
+                                       10000,
+                                       'aa_samples'
+                                       )
+        self.ao_samples = DNA(self.cycles_settings.ao_samples,
+                                       False,
+                                       1,
+                                       10000,
+                                       'ao_samples'
+                                       )
+
+        self.samples = DNA(self.cycles_settings.samples,
                                        False,
                                        1,
                                        999,
                                        'samples'
                                        )
-
-        self.tile_x = DNA(scene.render.tile_x, 
+        self.tile_x = DNA(self.scene_settings.tile_x, 
                                        False,
                                        1,
                                        1000,
                                        'tile_x'
                                        )
-        self.tile_y = DNA(scene.render.tile_y, 
+        self.tile_y = DNA(self.scene_settings.tile_y, 
                                        False,
                                        1,
                                        1000,
                                        'tile_y'
                                        )
 
-        self.DNA_Strand = [self.samples,
+        self.DNA_Strand = [self.aa_samples,
+                           self.ao_samples,
+                           self.samples,
                            self.tile_x, 
                            self.tile_y
                            ]
@@ -177,25 +176,23 @@ class Chromosome(object):
 
     def mutagen(self, mutation_rate):
         '''
-        Mutates the DNA in the DNA strand based off random chance and
-        mutation rate.
+        Mutates a letter in the DNA strand if luck of the die would have it.
         '''
-        for strand in self.DNA_Strand:
+        for letter in self.DNA_Strand:
             mutation = roll_dice(mutation_rate)
             if mutation:
-                strand.mutate()
+                letter.mutate()
 
 
     def make_render_settings(self):
-        #self.DNA_Strand = (list(set(self.DNA_Strand)))
-        settings = bpy.data.scenes[0]
-        scene_settings = settings.render
-        cycles_settings = settings.cycles
-        cycles_settings.samples = self.samples.attribute
-        scene_settings.tile_x = self.tile_x.attribute
-        scene_settings.tile_y = self.tile_y.attribute
-        for dna in self.DNA_Strand:
-            print (str(dna.name) + ' ' + str(dna.attribute))
+        self.cycles_settings.aa_samples = self.aa_samples.attribute
+        self.cycles_settings.ao_samples = self.ao_samples.attribute
+
+        self.cycles_settings.samples = self.samples.attribute
+        self.scene_settings.tile_x = self.tile_x.attribute
+        self.scene_settings.tile_y = self.tile_y.attribute
+        for letter in self.DNA_Strand:
+            print (str(letter.name) + ' ' + str(letter.attribute))
 
 
     def start_timer(self):
@@ -211,10 +208,12 @@ class Chromosome(object):
         start = self.render_duration.attribute
         self.render_duration.attribute = datetime.now() - start
         self.DNA_Strand.append(self.render_duration)
-        print (self.render_duration.attribute)
 
 
 def roll_dice(odds):
+    '''
+    Rolls the dice, returns true or false if  the roll is less than the odds.
+    '''
     roll = random.uniform(0.00001, 0.99999)
     if roll < odds:
         return True
@@ -224,7 +223,7 @@ def roll_dice(odds):
 
 class DNA(object):
     '''
-    - Mediator
+    - Adapter/mold?
     The dna class acts as an adpater between blender settings and the 
     boosters program. It facilates the interactions between boosters
     functions and blenders render settings.
@@ -244,9 +243,9 @@ class DNA(object):
         if self.boolean:
             self.attribute = random.choice([self.minimum, self.maximum])
         else:
-            floating = type(10.00)
-            t = type(self.attribute)
-            if t == floating:
+            attribute_type = type(self.attribute)
+            floating_type = type(10.00)
+            if attribute_type == floating_type:
                 self.attribute = random.uniform(self.minimum, self.maximum)
             else:
                 self.attribute = random.randint(self.minimum, self.maximum)
