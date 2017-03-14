@@ -40,6 +40,7 @@ class Commands(object):
 
 
     def render_image(self, chromosome):
+        tester(chromosome)
         image_path = ((R'render-bin\ ')[:-1] + chromosome.name)
         switch_path(self, image_path)
         chromosome.start_timer()
@@ -48,6 +49,22 @@ class Commands(object):
         csv_file_path = self.current_render_path[:-len(image_path)]
         switch_path(self, image_path)
         self.data_mgmt.write_csv(csv_file_path, 'data.csv', [chromosome])
+
+
+def tester(dna):
+    cycles = bpy.types.CyclesRenderSettings
+    scene = bpy.data.scenes[0]
+    cy = [cycles.aa_samples, 
+               cycles.ao_samples,
+               cycles.blur_glossy, 
+               cycles.debug_bvh_type,
+               cycles.debug_use_spatial_splits,
+               cycles.device,
+               cycles.diffuse_bounces,
+               cycles.film_exposure,
+               cycles.samples,
+             ]
+
 
 
 def switch_path(path, file_name):
@@ -132,21 +149,30 @@ class Chromosome(object):
         self.name = name
         cycles = bpy.types.CyclesRenderSettings
         scene = bpy.data.scenes[0]
+        self.samples = DNA(scene.cycles.samples,
+                                       False,
+                                       1,
+                                       999,
+                                       'samples'
+                                       )
+
         self.tile_x = DNA(scene.render.tile_x, 
                                        False,
                                        1,
                                        1000,
-                                       None,
                                        'tile_x'
                                        )
         self.tile_y = DNA(scene.render.tile_y, 
                                        False,
                                        1,
                                        1000,
-                                       None,
                                        'tile_y'
                                        )
-        self.DNA_Strand = [self.tile_x, self.tile_y]
+
+        self.DNA_Strand = [self.samples,
+                           self.tile_x, 
+                           self.tile_y
+                           ]
 
 
     def mutagen(self, mutation_rate):
@@ -161,9 +187,15 @@ class Chromosome(object):
 
 
     def make_render_settings(self):
-        self.DNA_Strand = (list(set(self.DNA_Strand)))
-        for strand in self.DNA_Strand:
-            strand.make_real()
+        #self.DNA_Strand = (list(set(self.DNA_Strand)))
+        settings = bpy.data.scenes[0]
+        scene_settings = settings.render
+        cycles_settings = settings.cycles
+        cycles_settings.samples = self.samples.attribute
+        scene_settings.tile_x = self.tile_x.attribute
+        scene_settings.tile_y = self.tile_y.attribute
+        for dna in self.DNA_Strand:
+            print (str(dna.name) + ' ' + str(dna.attribute))
 
 
     def start_timer(self):
@@ -171,7 +203,6 @@ class Chromosome(object):
                                        True,
                                        0,
                                        1,
-                                       None,
                                        'render_duration'
                                        )
 
@@ -198,13 +229,8 @@ class DNA(object):
     boosters program. It facilates the interactions between boosters
     functions and blenders render settings.
     '''
-    def __init__(self, raw_material, boolean, minimum, maximum, key, name):
-        self.real_setting = raw_material
-        self.key = key
-        if self.key != None:
-            self.attribute = self.real_setting[1][self.key]
-        else:
-            self.attribute = self.real_setting
+    def __init__(self, raw_material, boolean, minimum, maximum, name):
+        self.attribute = raw_material
         self.boolean = boolean
         self.minimum = minimum
         self.maximum = maximum
@@ -218,22 +244,12 @@ class DNA(object):
         if self.boolean:
             self.attribute = random.choice([self.minimum, self.maximum])
         else:
-            self.attribute = random.randint(self.minimum, self.maximum)
-
-
-    def make_real(self):
-        '''
-        This function re-instantiates the variables into the dna as "real"
-        under the .real_setting variable. The .real_setting variable is used
-        to give quick access for replacement of a blender render setting.
-        This should be used after any time variables may have been changed.
-        '''
-        if self.key != None:
-            self.real_setting[1][self.key] = self.attribute
-        else:
-            self.real_setting = self.attribute
-
-
+            floating = type(10.00)
+            t = type(self.attribute)
+            if t == floating:
+                self.attribute = random.uniform(self.minimum, self.maximum)
+            else:
+                self.attribute = random.randint(self.minimum, self.maximum)
 
 
 
