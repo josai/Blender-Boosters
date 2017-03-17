@@ -11,3 +11,9 @@
 
 
 ### Drawbacks 
+
+
+
+#### Quick References
+
+[Cycles Render Settings API](https://docs.blender.org/api/blender_python_api_2_64_1/bpy.types.CyclesRenderSettings.html#bpy.types.CyclesRenderSettings.debug_cancel_timeout)
