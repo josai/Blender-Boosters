@@ -1,6 +1,7 @@
 import bpy
 import csv
 import random
+import string
 from pathlib import Path
 from datetime import datetime
 
@@ -28,27 +29,38 @@ def procreate(num_of_creatures):
         gene.mutagen(settings.mutation_rate)
         gene.make_render_settings()
         blend.render_image(gene)
-        best_gene = fitness_function(gene, best_gene)
+        best_gene = fitness_function(gene, blend)
         count += (1)
 
 
-def fitness_function(gene_A, gene_B):
+def fitness_function(gene_A, commands):
     '''
-    Takes in two genes and returns the most fit one. Best on fastest render 
-    and quality of the image.
+    Returns the fastest gene so far.
     '''
-    print ('')
-    print ('')
-    if gene_A.render_duration.attribute < gene_B.render_duration.attribute:
-        print (gene_A.render_duration.attribute)
-        print ('Is faster than...')
-        print (gene_B.render_duration.attribute)
-        best = (gene_A)
-    else:
-        best = (gene_B)
-    print ('')
-    print ('')
-    return (best)
+    path = commands.csv_file_path
+    raw_csv = commands.data_mgmt.read_csv(path, 'data.csv')
+    render_times = []
+    if len(raw_csv) > 1:
+        for line in raw_csv:
+            line = line[::-1]
+            render_time = convert_type(line[0])
+            render_times.append(render_time)
+
+        fastest = min(render_times)
+        indexed = render_times.index(fastest)
+        gene_A.import_settings(raw_csv[indexed])
+
+    return (gene_A)
+
+
+def print_spaces(num):
+    '''
+    Prints specified number of spaces in console.
+    '''
+    count = 0
+    while count < num:
+        print ('')
+        count += 1
 
 
 class Settings(object):
@@ -78,14 +90,19 @@ class Commands(object):
         switch_path(self, image_path)
 
         print ('Rendering image: ' + str(chromosome.name))
+
         chromosome.start_timer()
         bpy.ops.render.render(write_still=True)
         chromosome.stop_timer()
+
         render_bin_path = self.current_render_path[:-len(chromosome.name)]
         chromosome.measure_fitness(render_bin_path, chromosome.name)
-        csv_file_path = self.current_render_path[:-len(image_path)]
+
+        self.csv_file_path = self.current_render_path[:-len(image_path)]
         switch_path(self, image_path)
-        self.data_mgmt.write_csv(csv_file_path, 'data.csv', [chromosome])
+
+        self.data_mgmt.write_csv(self.csv_file_path, 'data.csv', [chromosome])
+
 
 
 def switch_path(path, file_name):
@@ -131,6 +148,26 @@ class Data_Management(object):
             create_csv(path, data)
 
 
+    def read_csv(self, path, file_name):
+        '''
+        Returns CSV as lists for each row
+        '''
+        path = path + file_name
+        return_data = []
+        with open(path, 'r') as f:
+            reader = csv.reader(f)
+            first_row = True
+            for row in reader:
+                if not first_row:
+                    if len(row) > 0:
+                        return_data.append(row)
+                else:
+                    first_row = False
+        f.close()
+        return return_data
+
+
+
 def create_csv(path, data):
     '''
     This saves the dna of a chromosome in a csv file.
@@ -142,6 +179,7 @@ def create_csv(path, data):
     with open(path, 'w') as f:
         file = csv.writer(f, delimiter=',')
         file.writerow(headers)
+    f.close()
     add_csv_log(path, data)
 
 
@@ -157,6 +195,7 @@ def add_csv_log(path, data):
                 attributes.append(fine_data.attribute)
             file.writerow(attributes)
             attributes = []
+    f.close()
 
 
 class Chromosome(object):
@@ -213,11 +252,11 @@ class Chromosome(object):
                                        1000,
                                        'tile_y'
                                        )
-        self.image_fitness = DNA(0.0,
-                                 False,
-                                 0.0,
-                                 1.0,
-                                 'image_fitness'
+        self.image_fitness = DNA(100.0,
+                                       False,
+                                       0.0,
+                                       1.0,
+                                       'image_fitness'
                                  )
 
         self.DNA_Strand = ['default']
@@ -281,8 +320,8 @@ class Chromosome(object):
         '''
         if file_name != 'master.png':
             differences = []
-            master = img(path + 'master.png')
-            image = img(path + file_name + '.png')
+            master = Img(path + 'master.png')
+            image = Img(path + file_name + '.png')
             possible_colors = float(len(master.pixels) * 4)
             both_images = zip(image.pixels, master.pixels)
             for (pixel_color, master_color) in both_images:
@@ -293,11 +332,56 @@ class Chromosome(object):
             self.image_fitness.attribute = percent_correct
 
 
-class img(object):
+    def import_settings(self, list_of_attributes):
+        '''
+        Imports settings from a list of attributes.
+        '''
+        if len(self.DNA_Strand) > 1:
+            both_lists = zip(list_of_attributes, self.DNA_Strand)
+            for (attribute, dna) in both_lists:
+                print (dna.attribute)
+                dna.attribute = convert_type(attribute)
+        else:
+            print ("Couldn't import data from csv")
+
+
+def convert_type(a_string):
+    '''
+    Converts a string to the proper data type.
+    This is for getting raw data from a csv.
+
+    Parses the string and returns as proper format.
+    '''
+    a_string = str(a_string)
+    alphabet = string.ascii_letters
+    numbers = string.digits
+    for character in a_string:
+        if character in alphabet:
+            print ('is alpha')
+            if a_string == 'True':
+                return (True)
+            elif a_string == 'False':
+                return (False)
+            else:
+                return (a_string)
+        elif ':' in a_string:
+            date = datetime.strptime(a_string,"%H:%M:%S.%f")
+            return date
+        elif '.' in a_string:
+            return float(a_string)
+        else:
+            return int(a_string)
+
+
+
+
+
+
+
+class Img(object):
     '''
     This acts as a facade for dealing with image data.
     '''
-
     def __init__(self, image_path):
         images = bpy.data.images
         images.load(image_path)
