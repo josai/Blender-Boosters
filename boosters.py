@@ -22,18 +22,20 @@ def procreate(num_of_creatures):
     #best_gene.mutagen(0.99)  # seed!
     int_gene.make_render_settings()
     blend.render_image(int_gene)
+    min_fitness_level = settings.minimum_image_fitness
     best_gene = int_gene
     while count < num_of_creatures:
         gene = best_gene
+        gene.samples.attribute = 1
         gene.name = str(count)
         gene.mutagen(settings)
         gene.make_render_settings()
         blend.render_image(gene)
-        best_gene = fitness_function(gene, blend)
+        best_gene = fitness_function(gene, blend, min_fitness_level)
         count += (1)
 
 
-def fitness_function(gene_A, commands):
+def fitness_function(gene_A, commands, min_fitness_level):
     '''
     Returns the fastest gene so far.
     '''
@@ -44,7 +46,9 @@ def fitness_function(gene_A, commands):
         for line in raw_csv:
             line = line[::-1]
             render_time = convert_type(line[0])
-            render_times.append(render_time)
+            fitness_level = convert_type(line[1])
+            if fitness_level >= min_fitness_level:
+              render_times.append(render_time)
 
         fastest = min(render_times)
         indexed = render_times.index(fastest)
@@ -68,11 +72,19 @@ class Settings(object):
     Global settings such as mutation rate
     '''
     def __init__(self):
-        self.mutation_rate = 0.5
+        self.mutation_rate = 0.15
+        self.minimum_image_fitness = 95.0
 
         self.original_render_settings = get_original_settings()
         self.safe_mode_exceptions = ['tile_x',
-                                     'tile_y']
+                                     'tile_y',
+                                     'debug_bvh_type',
+                                     'device',
+                                     'progressive',
+                                     'seed',
+                                     'shading_system',
+                                     'use_transparent_shadows'
+                                     ]
         self.safe_mode = True
         # Safe mode prevents render settings from being larger than the
         # orginal settings. (i.e. samples being 1000 when the original
@@ -338,6 +350,55 @@ class Chromosome(object):
                                        999,
                                        'samples'
                                        )
+
+        self.seed = DNA(self.cycles_settings.seed,
+                                       False,
+                                       0,
+                                       99999,
+                                       'seed'
+                                       )
+        self.shading_system = DNA(self.cycles_settings.shading_system,
+                                       True,
+                                       True,
+                                       False,
+                                       'shading_system'
+                                       )
+        self.transmission_bounces = DNA(self.cycles_settings.transmission_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'transmission_bounces'
+                                       )
+        self.transparent_max_bounces = DNA(self.cycles_settings.transparent_max_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'transparent_max_bounces'
+                                       )
+        self.transparent_min_bounces = DNA(self.cycles_settings.transparent_min_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'transparent_min_bounces'
+                                       )
+
+        # Doesn't exist apperently ? -.-
+        #self.use_cache = DNA(self.cycles_settings.use_cache,
+        #                               True,
+        #                               True,
+        #                               False,
+        #                               'use_cache'
+        #                               )
+
+        self.use_transparent_shadows = DNA(self.cycles_settings.use_transparent_shadows,
+                                       True,
+                                       True,
+                                       False,
+                                       'use_transparent_shadows'
+                                       )
+
+
+
         self.tile_x = DNA(self.scene_settings.tile_x, 
                                        False,
                                        1,
@@ -356,14 +417,14 @@ class Chromosome(object):
                                        1.0,
                                        'image_fitness'
                                  )
-        self.DNA_Strand = self.int_strand(2)
+        self.int_strand(2)
 
 
     def mutagen(self, settings):
         '''
         Mutates a letter in the DNA strand if luck of the die would have it.
         '''
-        self.DNA_Strand = self.int_strand(2)
+        self.int_strand(2)
         mutation_rate = settings.mutation_rate
         for letter in self.DNA_Strand:
           mutation = roll_dice(mutation_rate)
@@ -374,12 +435,14 @@ class Chromosome(object):
                 letter_index = self.DNA_Strand.index(letter)
                 orginal_strand = settings.original_render_settings.DNA_Strand
                 original_letter = orginal_strand[letter_index]
-                if not letter.boolean or letter.name not in safe_mode_exceptions:
-                  # So that only non-booleans and specific exceptions
-                  # are subject to safe mode.
-                  if letter.attribute > original_letter.attribute:
-                    print ('Mutation was bad. Switched to safe mode.')
-                    letter = original_letter
+                if letter.name not in safe_mode_exceptions:
+                  if not letter.boolean:
+                    # So that only non-booleans and specific exceptions
+                    # are subject to safe mode.
+                    if letter.attribute > original_letter.attribute:
+                      letter.attribute = original_letter.attribute
+                      letter.maximum = original_letter.attribute
+        self.int_strand(2)
 
 
     def int_strand(self, mode):
@@ -403,18 +466,26 @@ class Chromosome(object):
                        self.min_bounces,
                        self.progressive,
                        self.samples,
+                       self.seed,
+                       self.shading_system,
+                       self.transmission_bounces,
+                       self.transparent_max_bounces,
+                       self.transparent_min_bounces,
+                       #self.use_cache,
+                       self.use_transparent_shadows,
                        self.tile_x,
                        self.tile_y,
                        ]
       if mode == 1:
         # For printing or saving in a CSV.
-        return strand + [self.image_fitness, self.render_duration]
+        strand = strand + [self.image_fitness, self.render_duration]
       if mode == 2:
         # For mutations or modifications of render settings.
-        return strand
+        strand = strand
       if mode == 3:
         # Don't use. This is a null.
-        return 'Default'
+        strand = ['Default']
+      self.DNA_Strand = strand
 
 
 
@@ -442,6 +513,16 @@ class Chromosome(object):
 
 
         self.cycles_settings.samples = self.samples.attribute
+        self.cycles_settings.seed = self.seed.attribute
+        self.cycles_settings.shading_system = self.shading_system.attribute
+        self.cycles_settings.transmission_bounces = self.transmission_bounces.attribute
+        self.cycles_settings.transparent_max_bounces = self.transparent_max_bounces.attribute
+        self.cycles_settings.transparent_min_bounces = self.transparent_min_bounces.attribute
+        #self.cycles_settings.use_cache = self.use_cache.attribute
+        self.cycles_settings.use_transparent_shadows = self.use_transparent_shadows.attribute
+
+
+
         self.scene_settings.tile_x = self.tile_x.attribute
         self.scene_settings.tile_y = self.tile_y.attribute
 
@@ -458,7 +539,10 @@ class Chromosome(object):
     def stop_timer(self):
         start = self.render_duration.attribute
         self.render_duration.attribute = datetime.now() - start
-        self.DNA_Strand = self.int_strand(1)
+        self.int_strand(1)
+
+
+    def print_strand(self):
         if len(self.DNA_Strand) > 3:
             for letter in self.DNA_Strand:
                 print (str(letter.name) + ' ' + str(letter.attribute))
@@ -466,24 +550,26 @@ class Chromosome(object):
             print ('Defualted settings')
 
 
-
     def measure_fitness(self, path, file_name):
         '''
         Measures the fitness of an image in ralation to the master image.
         Returns the absolute difference in pixels as a floating percentage.
         '''
-        if file_name != 'master.png':
+        if file_name != 'master':
             differences = []
-            master = Img(path + 'master.png')
-            image = Img(path + file_name + '.png')
+            master = Img(path,'master.png')
+            image = Img(path, (file_name + '.png'))
             possible_colors = float(len(master.pixels) * 4)
             both_images = zip(image.pixels, master.pixels)
             for (pixel_color, master_color) in both_images:
-                color_difference = abs(float(pixel_color - master_color))
+                color_difference = abs(pixel_color - master_color)
                 differences.append(color_difference)
-            perfect_pixels = possible_colors - sum(differences)
-            percent_correct = (perfect_pixels / possible_colors) * 100
-            self.image_fitness.attribute = percent_correct
+
+            # Total similarity as percent.
+            accuracy = sum(differences) / float(len(master.pixels))
+            percent_accuracy = 100 - (accuracy * 100)
+            self.image_fitness.attribute = percent_accuracy
+    
         else:
             self.image_fitness.attribute = 100.0
 
@@ -532,10 +618,10 @@ class Img(object):
     '''
     This acts as a facade for dealing with image data.
     '''
-    def __init__(self, image_path):
-        images = bpy.data.images
-        images.load(image_path)
-        self.image = images[0]
+    def __init__(self, image_path, image_name):
+        bimages = bpy.data.images
+        bimages.load(image_path + image_name)
+        self.image = bimages[image_name]
         self.width = self.image.size[0]
         self.height = self.image.size[1]
         self.pixel_count = (self.width * self.height)
