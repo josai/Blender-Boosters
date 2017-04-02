@@ -26,7 +26,7 @@ def procreate(num_of_creatures):
     while count < num_of_creatures:
         gene = best_gene
         gene.name = str(count)
-        gene.mutagen(settings.mutation_rate)
+        gene.mutagen(settings)
         gene.make_render_settings()
         blend.render_image(gene)
         best_gene = fitness_function(gene, blend)
@@ -69,6 +69,22 @@ class Settings(object):
     '''
     def __init__(self):
         self.mutation_rate = 0.5
+
+        self.original_render_settings = get_original_settings()
+        self.safe_mode_exceptions = ['tile_x',
+                                     'tile_y']
+        self.safe_mode = True
+        # Safe mode prevents render settings from being larger than the
+        # orginal settings. (i.e. samples being 1000 when the original
+        # settings had 30 samples.) It also prevents "dangerous" settings from
+        # being allowed. 
+
+
+def get_original_settings():
+  '''
+  Gets original render settings
+  '''
+  return Chromosome('Original_settings')
 
 
 class Commands(object):
@@ -234,6 +250,88 @@ class Chromosome(object):
                                        'STATIC_BVH',
                                        'debug_bvh_type'
                                        )
+
+        self.device = DNA(self.cycles_settings.device,
+                                       True,
+                                       'CPU',
+                                       'GPU',
+                                       'device'
+                                       )
+        self.diffuse_bounces = DNA(self.cycles_settings.diffuse_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'diffuse_bounces'
+                                       )
+        self.diffuse_samples = DNA(self.cycles_settings.diffuse_samples,
+                                       False,
+                                       1,
+                                       10000,
+                                       'diffuse_samples'
+                                       )
+        self.filter_type = DNA(self.cycles_settings.filter_type,
+                                       True,
+                                       'BOX',
+                                       'GAUSSIAN',
+                                       'filter_type'
+                                       )
+        self.filter_width = DNA(self.cycles_settings.filter_width,
+                                       False,
+                                       0.01,
+                                       10.0,
+                                       'filter_width'
+                                       )
+        self.glossy_bounces = DNA(self.cycles_settings.glossy_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'glossy_bounces'
+                                       )
+        self.glossy_samples = DNA(self.cycles_settings.glossy_samples,
+                                       False,
+                                       0,
+                                       10000,
+                                       'glossy_samples'
+                                       )
+        self.max_bounces = DNA(self.cycles_settings.max_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'max_bounces'
+                                       )
+        self.mesh_light_samples = DNA(self.cycles_settings.mesh_light_samples,
+                                       False,
+                                       1,
+                                       10000,
+                                       'mesh_light_samples'
+                                       )
+        self.min_bounces = DNA(self.cycles_settings.min_bounces,
+                                       False,
+                                       0,
+                                       1024,
+                                       'min_bounces'
+                                       )
+        # Doesn't exist apperently ? -.-
+        #self.no_caustics = DNA(self.cycles_settings.no_caustics,
+        #                               True,
+        #                               True,
+        #                               False,
+        #                               'no_caustics'
+        #                               )
+        self.progressive = DNA(self.cycles_settings.progressive,
+                                       True,
+                                       'PATH',
+                                       'BRANCHED_PATH',
+                                       'progressive'
+                                       )
+        # Doesn't exist apperently ? -.-
+        #self.sample_clamp = DNA(self.cycles_settings.sample_clamp,
+        #                               False,
+        #                               0,
+        #                               1000, # fake default. It's INF!
+        #                               'sample_clamp'
+        #                               )
+        
         self.samples = DNA(self.cycles_settings.samples,
                                        False,
                                        1,
@@ -258,20 +356,67 @@ class Chromosome(object):
                                        1.0,
                                        'image_fitness'
                                  )
+        self.DNA_Strand = self.int_strand(2)
 
-        self.DNA_Strand = ['default']
 
-
-    def mutagen(self, mutation_rate):
+    def mutagen(self, settings):
         '''
         Mutates a letter in the DNA strand if luck of the die would have it.
         '''
-        setting_names = ['render_duration']
+        self.DNA_Strand = self.int_strand(2)
+        mutation_rate = settings.mutation_rate
         for letter in self.DNA_Strand:
-            if self.name not in setting_names:
-                mutation = roll_dice(mutation_rate)
-                if mutation:
-                    letter.mutate()
+          mutation = roll_dice(mutation_rate)
+          if mutation:
+              letter.mutate()
+              if settings.safe_mode:
+                safe_mode_exceptions = settings.safe_mode_exceptions
+                letter_index = self.DNA_Strand.index(letter)
+                orginal_strand = settings.original_render_settings.DNA_Strand
+                original_letter = orginal_strand[letter_index]
+                if not letter.boolean or letter.name not in safe_mode_exceptions:
+                  # So that only non-booleans and specific exceptions
+                  # are subject to safe mode.
+                  if letter.attribute > original_letter.attribute:
+                    print ('Mutation was bad. Switched to safe mode.')
+                    letter = original_letter
+
+
+    def int_strand(self, mode):
+      '''
+      Assigns self.DNA_strand variable for the appropriate use case. Such
+      as printing or mutations. Mode is the use case.
+      '''
+      strand = [self.aa_samples,
+                       self.ao_samples,
+                       self.blur_glossy,
+                       self.debug_bvh_type,
+                       self.device,
+                       self.diffuse_bounces, 
+                       self.diffuse_samples,
+                       self.filter_type,
+                       self.filter_width,
+                       self.glossy_bounces,
+                       self.glossy_samples,
+                       self.max_bounces,
+                       self.mesh_light_samples,
+                       self.min_bounces,
+                       self.progressive,
+                       self.samples,
+                       self.tile_x,
+                       self.tile_y,
+                       ]
+      if mode == 1:
+        # For printing or saving in a CSV.
+        return strand + [self.image_fitness, self.render_duration]
+      if mode == 2:
+        # For mutations or modifications of render settings.
+        return strand
+      if mode == 3:
+        # Don't use. This is a null.
+        return 'Default'
+
+
 
 
     def make_render_settings(self):
@@ -279,6 +424,23 @@ class Chromosome(object):
         self.cycles_settings.ao_samples = self.ao_samples.attribute
         self.cycles_settings.blur_glossy = self.blur_glossy.attribute
         self.cycles_settings.debug_bvh_type = self.debug_bvh_type.attribute
+
+        self.cycles_settings.device = self.device.attribute
+        self.cycles_settings.diffuse_bounces = self.diffuse_bounces.attribute
+        self.cycles_settings.diffuse_samples = self.diffuse_samples.attribute
+        self.cycles_settings.filter_type = self.filter_type.attribute
+        self.cycles_settings.filter_width = self.filter_width.attribute
+        self.cycles_settings.glossy_bounces = self.glossy_bounces.attribute
+        self.cycles_settings.glossy_samples = self.glossy_samples.attribute
+        self.cycles_settings.max_bounces = self.max_bounces.attribute
+        self.cycles_settings.mesh_light_samples = self.mesh_light_samples.attribute
+        self.cycles_settings.min_bounces = self.min_bounces.attribute
+        #self.cycles_settings.no_caustics = self.no_caustics.attribute
+        self.cycles_settings.progressive = self.progressive.attribute
+        #self.cycles_settings.sample_clamp = self.sample_clamp.attribute
+
+
+
         self.cycles_settings.samples = self.samples.attribute
         self.scene_settings.tile_x = self.tile_x.attribute
         self.scene_settings.tile_y = self.tile_y.attribute
@@ -296,16 +458,7 @@ class Chromosome(object):
     def stop_timer(self):
         start = self.render_duration.attribute
         self.render_duration.attribute = datetime.now() - start
-        self.DNA_Strand = [self.aa_samples,
-                           self.ao_samples,
-                           self.blur_glossy,
-                           self.debug_bvh_type,
-                           self.samples,
-                           self.tile_x, 
-                           self.tile_y,
-                           self.image_fitness,
-                           self.render_duration
-                           ]
+        self.DNA_Strand = self.int_strand(1)
         if len(self.DNA_Strand) > 3:
             for letter in self.DNA_Strand:
                 print (str(letter.name) + ' ' + str(letter.attribute))
@@ -313,10 +466,11 @@ class Chromosome(object):
             print ('Defualted settings')
 
 
+
     def measure_fitness(self, path, file_name):
         '''
         Measures the fitness of an image in ralation to the master image.
-        Returns the absolute difference in pixels as a proportion.
+        Returns the absolute difference in pixels as a floating percentage.
         '''
         if file_name != 'master.png':
             differences = []
@@ -330,16 +484,17 @@ class Chromosome(object):
             perfect_pixels = possible_colors - sum(differences)
             percent_correct = (perfect_pixels / possible_colors) * 100
             self.image_fitness.attribute = percent_correct
+        else:
+            self.image_fitness.attribute = 100.0
 
 
     def import_settings(self, list_of_attributes):
         '''
-        Imports settings from a list of attributes.
+        Imports settings from a list of attributes that or text-strings.
         '''
         if len(self.DNA_Strand) > 1:
             both_lists = zip(list_of_attributes, self.DNA_Strand)
             for (attribute, dna) in both_lists:
-                print (dna.attribute)
                 dna.attribute = convert_type(attribute)
         else:
             print ("Couldn't import data from csv")
@@ -348,16 +503,16 @@ class Chromosome(object):
 def convert_type(a_string):
     '''
     Converts a string to the proper data type.
-    This is for getting raw data from a csv.
+    This is for getting raw data from a CSV.
 
-    Parses the string and returns as proper format.
+    In other words, it parses the string and returns as it as the proper data
+    format because they are inputted as text-strings.
     '''
     a_string = str(a_string)
     alphabet = string.ascii_letters
     numbers = string.digits
     for character in a_string:
         if character in alphabet:
-            print ('is alpha')
             if a_string == 'True':
                 return (True)
             elif a_string == 'False':
@@ -373,11 +528,6 @@ def convert_type(a_string):
             return int(a_string)
 
 
-
-
-
-
-
 class Img(object):
     '''
     This acts as a facade for dealing with image data.
@@ -389,12 +539,12 @@ class Img(object):
         self.width = self.image.size[0]
         self.height = self.image.size[1]
         self.pixel_count = (self.width * self.height)
-        self.pixels = self.image.pixels[:] #fl
+        self.pixels = self.image.pixels[:]
 
 
 def roll_dice(odds):
     '''
-    Rolls the dice, returns true or false if  the roll is less than the odds.
+    Rolls the dice, returns true or false if the roll is less than the odds.
     '''
     roll = random.uniform(0.00001, 0.99999)
     if roll < odds:
