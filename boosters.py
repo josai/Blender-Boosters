@@ -7,7 +7,72 @@ from datetime import datetime
 
 
 def main():
-    procreate(6)
+    timr = Chromosome('timer')
+    timr.start_timer()
+
+    total_frames = set_most_difficult_frame()
+    procreate(total_frames / 3)
+
+    # Renders animation
+
+
+
+    blend = Commands()
+    gene = Chromosome('master')
+    blend.render_folder = (R'real_render-bin\ ')[:-1]
+    blend.render_image(gene)
+    scene = bpy.data.scenes[0]
+    current_frame = scene.frame_start
+    last_frame = scene.frame_end
+    while current_frame <= last_frame:
+      gene.name = str(current_frame)
+      scene.frame_set(current_frame)
+      blend.render_image(gene)
+      current_frame += 1
+
+    timr.stop_timer()
+    print ('Total render time including boosters = ' + str(timr.render_duration.attribute))
+
+
+
+def set_most_difficult_frame():
+
+
+    print ('Finding most difficult frame to render...')
+    blend = Commands()
+    scene = bpy.data.scenes[0]
+    orginal_size = scene.render.resolution_percentage
+    scene.render.resolution_percentage = 10
+
+    last_frame = scene.frame_end
+    current_frame = scene.frame_start
+    total_frames = last_frame - current_frame
+    current_render_settings = Chromosome('master')
+    blend.csv_file = 'tiny_animation.csv'
+    blend.render_folder = (R'tiny_render-bin\ ')[:-1]
+    blend.render_image(current_render_settings)
+    while current_frame < last_frame:
+      current_render_settings.name = str(current_frame)
+      scene.frame_set(current_frame)
+      blend.render_image(current_render_settings)
+      current_frame += 5
+    gene = current_render_settings
+
+    
+    fast_frame = fitness_function(gene, blend, 0.0, min)
+    print ('Fastest frame = ' + str(fast_frame.name) + ' ' + str(fast_frame.render_duration.attribute))
+    slowest_frame = fitness_function(gene, blend, 0.0, max)
+    print ('flowest frame = ' + str(slowest_frame.name) + ' ' + str(slowest_frame.render_duration.attribute))
+    
+    if slowest_frame.name != 'master':
+      hardest_frame = int(slowest_frame.name)
+      print ('Hardest frame to render is: ' + str(hardest_frame))
+      scene.frame_set(hardest_frame)
+
+    scene.render.resolution_percentage = orginal_size
+    return (total_frames)
+
+
 
 
 def procreate(num_of_creatures):
@@ -15,7 +80,7 @@ def procreate(num_of_creatures):
     Creates x amount of creatures improving upon each iteration via
     fitness functions
     '''
-    count = 0
+    count = 1
     settings = Settings()
     blend = Commands()
     int_gene = Chromosome('master')
@@ -31,30 +96,39 @@ def procreate(num_of_creatures):
         gene.mutagen(settings)
         gene.make_render_settings()
         blend.render_image(gene)
-        best_gene = fitness_function(gene, blend, min_fitness_level)
+        best_gene = fitness_function(gene, blend, min_fitness_level, min)
         count += (1)
 
+    best_gene = fitness_function(gene, blend, min_fitness_level, min)
+    gene.make_render_settings()
 
-def fitness_function(gene_A, commands, min_fitness_level):
+
+def fitness_function(gene_A, commands, min_fitness_level, function):
     '''
     Returns the fastest gene so far.
     '''
     path = commands.csv_file_path
-    raw_csv = commands.data_mgmt.read_csv(path, 'data.csv')
+    raw_csv = commands.data_mgmt.read_csv(path, commands.csv_file)
     render_times = []
+    indexes = []
+    new_gene = gene_A
     if len(raw_csv) > 1:
+        in_num = 0
         for line in raw_csv:
             line = line[::-1]
             render_time = convert_type(line[0])
             fitness_level = convert_type(line[1])
             if fitness_level >= min_fitness_level:
               render_times.append(render_time)
+              indexes.append(in_num)
+            in_num += 1
 
-        fastest = min(render_times)
+        fastest = function(render_times)
         indexed = render_times.index(fastest)
-        gene_A.import_settings(raw_csv[indexed])
+        real_index = indexes[indexed]
+        new_gene.import_settings(raw_csv[real_index])
 
-    return (gene_A)
+    return (new_gene)
 
 
 def print_spaces(num):
@@ -72,8 +146,8 @@ class Settings(object):
     Global settings such as mutation rate
     '''
     def __init__(self):
-        self.mutation_rate = 0.15
-        self.minimum_image_fitness = 95.0
+        self.mutation_rate = 0.05
+        self.minimum_image_fitness = 90
 
         self.original_render_settings = get_original_settings()
         self.safe_mode_exceptions = ['tile_x',
@@ -111,10 +185,12 @@ class Commands(object):
         self.main_render_path = clip_path(path)
         self.current_render_path = self.main_render_path
         self.data_mgmt = Data_Management()
+        self.csv_file = 'data.csv'
+        self.render_folder = (R'render-bin\ ')[:-1]
 
 
     def render_image(self, chromosome):
-        image_path = ((R'render-bin\ ')[:-1] + chromosome.name)
+        image_path = (self.render_folder + chromosome.name)
         switch_path(self, image_path)
 
         print ('Rendering image: ' + str(chromosome.name))
@@ -125,11 +201,12 @@ class Commands(object):
 
         render_bin_path = self.current_render_path[:-len(chromosome.name)]
         chromosome.measure_fitness(render_bin_path, chromosome.name)
+        print (chromosome.image_fitness.attribute)
 
         self.csv_file_path = self.current_render_path[:-len(image_path)]
         switch_path(self, image_path)
 
-        self.data_mgmt.write_csv(self.csv_file_path, 'data.csv', [chromosome])
+        self.data_mgmt.write_csv(self.csv_file_path, self.csv_file, [chromosome])
 
 
 
@@ -167,15 +244,6 @@ class Data_Management(object):
     creates and uses to store data on each gene.
     '''
 
-    def write_csv(self, path, file_name, data):
-        path = path + file_name
-        file = Path(path)
-        if file.is_file():
-            add_csv_log(path, data)
-        else:
-            create_csv(path, data)
-
-
     def read_csv(self, path, file_name):
         '''
         Returns CSV as lists for each row
@@ -195,35 +263,45 @@ class Data_Management(object):
         return return_data
 
 
+    def add_csv_log(self, path, data):
+        '''
+        This saves the dna of a chromosome in a csv file.
+        '''
+        with open(path, 'a') as f:
+            file = csv.writer(f, delimiter=',')
+            # Includes name of the image.
+            for data_point in data:
+                attributes = [str(data_point.name)]
+                for fine_data in data_point.DNA_Strand:
+                    attributes.append(fine_data.attribute)
+                file.writerow(attributes)
+                #attributes = []
+        f.close()
 
-def create_csv(path, data):
-    '''
-    This saves the dna of a chromosome in a csv file.
-    '''
-    head = (data[0].DNA_Strand)
-    headers = []
-    for header in head:
-        headers.append(header.name)
-    with open(path, 'w') as f:
-        file = csv.writer(f, delimiter=',')
-        file.writerow(headers)
-    f.close()
-    add_csv_log(path, data)
+
+    def create_csv(self, path, data):
+        '''
+        This saves the dna of a chromosome in a csv file.
+        '''
+        head = (data[0].DNA_Strand)
+        # Int with name field
+        headers = ['name']
+        for header in head:
+            headers.append(header.name)
+        with open(path, 'w') as f:
+            file = csv.writer(f, delimiter=',')
+            file.writerow(headers)
+        f.close()
+        self.add_csv_log(path, data)
 
 
-def add_csv_log(path, data):
-    '''
-    This saves the dna of a chromosome in a csv file.
-    '''
-    with open(path, 'a') as f:
-        file = csv.writer(f, delimiter=',')
-        attributes = []
-        for data_point in data:
-            for fine_data in data_point.DNA_Strand:
-                attributes.append(fine_data.attribute)
-            file.writerow(attributes)
-            attributes = []
-    f.close()
+    def write_csv(self, path, file_name, data):
+        path = path + file_name
+        file = Path(path)
+        if file.is_file():
+            self.add_csv_log(path, data)
+        else:
+            self.create_csv(path, data)
 
 
 class Chromosome(object):
@@ -576,9 +654,11 @@ class Chromosome(object):
 
     def import_settings(self, list_of_attributes):
         '''
-        Imports settings from a list of attributes that or text-strings.
+        Imports settings from a list of attributes that are text-strings.
         '''
         if len(self.DNA_Strand) > 1:
+            self.name = convert_type(list_of_attributes[0])
+            list_of_attributes = list_of_attributes[1:]
             both_lists = zip(list_of_attributes, self.DNA_Strand)
             for (attribute, dna) in both_lists:
                 dna.attribute = convert_type(attribute)
@@ -591,7 +671,7 @@ def convert_type(a_string):
     Converts a string to the proper data type.
     This is for getting raw data from a CSV.
 
-    In other words, it parses the string and returns as it as the proper data
+    In other words, it parses the string and returns it as the proper data
     format because they are inputted as text-strings.
     '''
     a_string = str(a_string)
