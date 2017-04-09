@@ -8,6 +8,8 @@
 * Select your render output folder and change the file extentions to be .PNG
 * Then open up the script and run it. You may want to open the command prompt so you can see the progress.
 
+When you run the script it will optimize the render settings and then render your entire animation.
+
 Unfortunately boosters is windows only currently.
 
 
