@@ -156,8 +156,7 @@ class Settings(object):
                                      'device',
                                      'progressive',
                                      'seed',
-                                     'shading_system',
-                                     'use_transparent_shadows'
+                                     'shading_system'
                                      ]
         self.safe_mode = True
         # Safe mode prevents render settings from being larger than the
@@ -395,11 +394,11 @@ class Chromosome(object):
                                        10000,
                                        'mesh_light_samples'
                                        )
-        self.min_bounces = DNA(self.cycles_settings.min_bounces,
+        self.min_light_bounces = DNA(self.cycles_settings.min_light_bounces,
                                        False,
                                        0,
                                        1024,
-                                       'min_bounces'
+                                       'min_light_bounces'
                                        )
         # Doesn't exist apperently ? -.-
         #self.no_caustics = DNA(self.cycles_settings.no_caustics,
@@ -453,11 +452,11 @@ class Chromosome(object):
                                        1024,
                                        'transparent_max_bounces'
                                        )
-        self.transparent_min_bounces = DNA(self.cycles_settings.transparent_min_bounces,
+        self.min_transparent_bounces = DNA(self.cycles_settings.min_transparent_bounces,
                                        False,
                                        0,
                                        1024,
-                                       'transparent_min_bounces'
+                                       'min_transparent_bounces'
                                        )
 
         # Doesn't exist apperently ? -.-
@@ -467,13 +466,6 @@ class Chromosome(object):
         #                               False,
         #                               'use_cache'
         #                               )
-
-        self.use_transparent_shadows = DNA(self.cycles_settings.use_transparent_shadows,
-                                       True,
-                                       True,
-                                       False,
-                                       'use_transparent_shadows'
-                                       )
 
 
 
@@ -541,16 +533,15 @@ class Chromosome(object):
                        self.glossy_samples,
                        self.max_bounces,
                        self.mesh_light_samples,
-                       self.min_bounces,
+                       self.min_light_bounces,
                        self.progressive,
                        self.samples,
                        self.seed,
                        self.shading_system,
                        self.transmission_bounces,
                        self.transparent_max_bounces,
-                       self.transparent_min_bounces,
+                       self.min_transparent_bounces,
                        #self.use_cache,
-                       self.use_transparent_shadows,
                        self.tile_x,
                        self.tile_y,
                        ]
@@ -583,7 +574,7 @@ class Chromosome(object):
         self.cycles_settings.glossy_samples = self.glossy_samples.attribute
         self.cycles_settings.max_bounces = self.max_bounces.attribute
         self.cycles_settings.mesh_light_samples = self.mesh_light_samples.attribute
-        self.cycles_settings.min_bounces = self.min_bounces.attribute
+        self.cycles_settings.min_light_bounces = self.min_light_bounces.attribute
         #self.cycles_settings.no_caustics = self.no_caustics.attribute
         self.cycles_settings.progressive = self.progressive.attribute
         #self.cycles_settings.sample_clamp = self.sample_clamp.attribute
@@ -595,9 +586,8 @@ class Chromosome(object):
         self.cycles_settings.shading_system = self.shading_system.attribute
         self.cycles_settings.transmission_bounces = self.transmission_bounces.attribute
         self.cycles_settings.transparent_max_bounces = self.transparent_max_bounces.attribute
-        self.cycles_settings.transparent_min_bounces = self.transparent_min_bounces.attribute
+        self.cycles_settings.min_transparent_bounces = self.min_transparent_bounces.attribute
         #self.cycles_settings.use_cache = self.use_cache.attribute
-        self.cycles_settings.use_transparent_shadows = self.use_transparent_shadows.attribute
 
 
 
